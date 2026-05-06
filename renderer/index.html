@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ROS2 Flow Studio</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<div id="menubar">
+  <span class="logo">⬡ ROS2 FLOW STUDIO</span>
+  <button class="menu-btn" onclick="fileMenu()">File</button>
+  <button class="menu-btn" onclick="editMenu()">Edit</button>
+  <button class="menu-btn" onclick="viewMenu()">View</button>
+  <button class="menu-btn" onclick="rosMenu()">ROS</button>
+  <button class="menu-btn run-btn" onclick="runAll()">▶ Run All</button>
+  <button class="menu-btn stop-btn" onclick="stopAll()">■ Stop All</button>
+  <span class="spacer"></span>
+  <span class="status" id="project-name">ros2_flow.ros2flow*</span>
+  <div class="ros-status"><div class="status-dot"></div><span style="font-size:10px;color:var(--text3)">humble</span></div>
+</div>
+
+<div id="main">
+  <div id="lib-panel">
+    <div class="panel-header">Node Library <span style="font-size:9px;color:var(--text3)">Shift+A</span></div>
+    <div style="padding:0 6px;"><input id="lib-search" type="text" placeholder="Search nodes..." oninput="filterLib(this.value)"></div>
+    <div id="lib-list"></div>
+  </div>
+
+  <div id="canvas-wrap"
+    onmousedown="canvasMouseDown(event)"
+    onmousemove="canvasMouseMove(event)"
+    onmouseup="canvasMouseUp(event)"
+    onwheel="canvasWheel(event)"
+    oncontextmenu="showCtxMenu(event)">
+    <canvas id="grid-bg"></canvas>
+    <div id="canvas">
+      <svg id="wire-svg">
+        <g id="wires-group"></g>
+        <path id="wire-preview" class="wire-preview" style="display:none"/>
+      </svg>
+    </div>
+    <div id="kbd-hints">
+      <kbd>Shift+A</kbd> Add &nbsp; <kbd>G</kbd> Grab &nbsp; <kbd>X</kbd> Delete &nbsp;
+      <kbd>Ctrl+D</kbd> Duplicate &nbsp; <kbd>H</kbd> Collapse &nbsp; <kbd>Space</kbd> Run/Stop<br>
+      <kbd>Scroll</kbd> Zoom &nbsp; <kbd>Alt+Drag</kbd> Pan &nbsp; <kbd>Esc</kbd> Cancel
+    </div>
+  </div>
+
+  <div id="inspector">
+    <div id="inspector-tabs">
+      <div class="itab active" onclick="showITab('properties')">Props</div>
+      <div class="itab" onclick="showITab('ports')">I/O</div>
+      <div class="itab" onclick="showITab('params')">Params</div>
+      <div class="itab" onclick="showITab('graph')">Graph</div>
+    </div>
+    <div id="inspector-body">
+      <div id="iproperties" class="ipanel active">
+        <div style="color:var(--text3);font-size:10px;padding:16px 0;text-align:center;line-height:2;">
+          Select a node to inspect<br>
+          <span style="font-size:9px;">Double-click library items to add</span>
+        </div>
+      </div>
+      <div id="iports" class="ipanel"></div>
+      <div id="iparams" class="ipanel"></div>
+      <div id="igraph" class="ipanel">
+        <div class="isection">Graph Stats</div>
+        <div class="ifield"><label>Total Nodes</label><input readonly id="stat-nodes" value="0"></div>
+        <div class="ifield"><label>Connections</label><input readonly id="stat-wires" value="0"></div>
+        <div class="ifield"><label>Active Topics</label><input readonly id="stat-topics" value="0"></div>
+        <div class="ifield"><label>ROS Distro</label><input readonly value="humble"></div>
+        <div class="ifield"><label>Workspace</label><input readonly value="~/ros2_ws"></div>
+        <div class="isection">Actions</div>
+        <button class="ibtn primary" onclick="exportLaunch()">⬇ Export launch.py</button>
+        <button class="ibtn" onclick="exportJSON()">⬇ Export .ros2flow</button>
+        <button class="ibtn" onclick="syncLiveGraph()">⟳ Sync Live Graph</button>
+        <button class="ibtn danger" onclick="clearGraph()">✕ Clear All</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="bottom-panel">
+  <div id="bottom-tabs">
+    <div class="btab active" onclick="showBTab('log')">ROS Log</div>
+    <div class="btab" onclick="showBTab('topics')">Topic Monitor</div>
+    <div class="btab" onclick="showBTab('terminal')">Terminal</div>
+    <div class="btab" onclick="showBTab('bag')">Bag Recorder</div>
+  </div>
+  <div id="bottom-body">
+    <div id="blog" class="bpanel active"></div>
+    <div id="btopics" class="bpanel"></div>
+    <div id="bterminal" class="bpanel" style="font-family:monospace;font-size:11px;color:#c9d1d9;">
+      <div style="color:#56d364;">user@ros2-flow:~$ <span style="color:#c9d1d9;">ros2 node list</span></div>
+      <div style="color:var(--text2);margin-top:2px;">/publisher_node_1</div>
+      <div style="color:var(--text2)">/subscriber_node_2</div>
+      <div style="color:var(--text2)">/param_node_4</div>
+      <div style="color:#56d364;margin-top:6px;">user@ros2-flow:~$ <span id="term-cursor" style="color:var(--accent)">█</span></div>
+      <div style="color:var(--text3);margin-top:4px;font-size:10px;">Terminal connected — In the Electron build this is a full PTY via node-pty.</div>
+    </div>
+    <div id="bbag" class="bpanel">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <button class="ibtn primary" style="width:auto;padding:3px 12px;" onclick="toggleBag()">⏺ Record</button>
+        <span id="bag-status" style="font-size:10px;color:var(--text3);">Idle — no bag active</span>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:4px;">Topics to record (all selected by default):</div>
+      <div id="bag-topic-list"></div>
+    </div>
+  </div>
+</div>
+
+<div id="add-menu">
+  <input id="add-search" type="text" placeholder="Search nodes... (Esc to close)" oninput="filterAddMenu(this.value)">
+  <div id="add-menu-list"></div>
+</div>
+
+<div id="ctx-menu">
+  <div class="ctx-item" onclick="ctxAction('add')">Add Node <span class="ctx-shortcut">Shift+A</span></div>
+  <div class="ctx-item" onclick="ctxAction('dup')">Duplicate Node <span class="ctx-shortcut">Ctrl+D</span></div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="ctxAction('code')">Edit Code <span class="ctx-shortcut">E</span></div>
+  <div class="ctx-item" onclick="ctxAction('run')">Run / Stop <span class="ctx-shortcut">Space</span></div>
+  <div class="ctx-item" onclick="ctxAction('collapse')">Collapse <span class="ctx-shortcut">H</span></div>
+  <div class="ctx-item" onclick="ctxAction('inspect')">Inspect <span class="ctx-shortcut">Tab</span></div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item danger" onclick="ctxAction('delete')">Delete <span class="ctx-shortcut">X</span></div>
+</div>
+
+<div id="code-editor-wrap">
+  <div id="editor-header">
+    <span id="editor-node-label">node.py</span>
+    <div id="editor-tabs">
+      <button class="etab active" onclick="switchEditorTab('node.py')">node.py</button>
+      <button class="etab" onclick="switchEditorTab('CMakeLists.txt')">CMakeLists</button>
+      <button class="etab" onclick="switchEditorTab('package.xml')">package.xml</button>
+      <button class="etab" onclick="switchEditorTab('launch.py')">launch.py</button>
+    </div>
+    <button id="editor-close" onclick="closeEditor()">✕</button>
+  </div>
+  <div id="code-area">
+    <textarea id="code-textarea" spellcheck="false" oninput="lintCode(this.value)"></textarea>
+  </div>
+  <div id="editor-footer">
+    <button class="editor-btn run" onclick="applyAndReload()">▶ Apply & Reload</button>
+    <button class="editor-btn" onclick="formatCode()">⟳ Format</button>
+    <button class="editor-btn" onclick="insertSnippet()">⊞ Snippet</button>
+    <button class="editor-btn" onclick="closeEditor()">Cancel</button>
+    <span id="lint-status" class="lint-ok">✓ No issues</span>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

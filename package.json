@@ -1,0 +1,12 @@
+{
+  "name": "ros2-flow-studio",
+  "version": "0.1.0",
+  "description": "ROS2 Flow Studio - Electron node graph editor",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^29.3.0"
+  }
+}
