@@ -2,6 +2,10 @@ const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+const {
+  loadProjectDocument,
+  createProjectDocumentFromGraph
+} = require('./core/project-store');
 
 let mainWindow = null;
 const running = new Map();
@@ -58,7 +62,14 @@ ipcMain.handle('project:open', async () => {
   if (res.canceled || !res.filePaths.length) return null;
   const filePath = res.filePaths[0];
   const content = fs.readFileSync(filePath, 'utf-8');
-  return { filePath, data: JSON.parse(content) };
+  try {
+    const raw = JSON.parse(content);
+    const doc = loadProjectDocument(raw);
+    return { filePath, data: doc };
+  } catch (error) {
+    await dialog.showErrorBox('Failed to open project', String(error.message || error));
+    return null;
+  }
 });
 
 ipcMain.handle('project:save', async (event, { data, filePath }) => {
@@ -72,7 +83,8 @@ ipcMain.handle('project:save', async (event, { data, filePath }) => {
     if (res.canceled || !res.filePath) return null;
     target = res.filePath;
   }
-  fs.writeFileSync(target, JSON.stringify(data, null, 2), 'utf-8');
+  const doc = createProjectDocumentFromGraph(data || {});
+  fs.writeFileSync(target, JSON.stringify(doc, null, 2), 'utf-8');
   return { filePath: target };
 });
 

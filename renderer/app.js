@@ -18,6 +18,13 @@ let bagRecording = false;
 let currentEditorNode = null;
 let currentEditorTab = 'node.py';
 let logCount = 0;
+let currentProject = {
+  id: 'ros2-flow-project',
+  name: 'untitled.ros2flow',
+  rosDistro: 'humble',
+  runMode: 'launch',
+  workspace: { mode: 'per-project', path: '' }
+};
 
 // ====================================================================
 // NODE TEMPLATES
@@ -1046,12 +1053,16 @@ function showCtxMenu(e) {
 
 function onDocClick(e){
   if(!e.target.closest('#ctx-menu'))document.getElementById('ctx-menu').classList.remove('open');
-  if(!e.target.closest('#add-menu')&&!e.target.closest('#lib-list'))closeAddMenu();
+  if(!e.target.closest('#add-menu')&&!e.target.closest('#lib-list')&&!e.target.closest('#ctx-menu'))closeAddMenu();
 }
 
 function ctxAction(action){
   document.getElementById('ctx-menu').classList.remove('open');
-  if(action==='add')showAddMenu(ctxMenuPos.x,ctxMenuPos.y);
+  if(action==='add'){
+    const pos = screenToCanvas(ctxMenuPos.x + 26, ctxMenuPos.y + 20);
+    const created = addNode('custom', pos) || addNode(NODE_TYPES[0]?.id, pos);
+    if (created) selectNode(created.id);
+  }
   else if(action==='dup'&&ctxTargetNode)duplicateNode(ctxTargetNode.id);
   else if(action==='code'&&ctxTargetNode)openEditor(ctxTargetNode.id);
   else if(action==='run'&&ctxTargetNode)toggleRun(ctxTargetNode.id);
@@ -1367,7 +1378,18 @@ const hasApi = typeof window.api !== 'undefined';
 
 if (hasApi) {
   window.api.onMenuAction(async (action) => {
-    if (action === 'new') { clearGraphNoConfirm(); lastProjectPath = null; setProjectTitle('untitled.ros2flow*'); }
+    if (action === 'new') {
+      clearGraphNoConfirm();
+      lastProjectPath = null;
+      currentProject = {
+        id: 'ros2-flow-project',
+        name: 'untitled.ros2flow',
+        rosDistro: 'humble',
+        runMode: 'launch',
+        workspace: { mode: 'per-project', path: '' }
+      };
+      setProjectTitle('untitled.ros2flow*');
+    }
     if (action === 'open') await openProject();
     if (action === 'save') await saveProject(false);
     if (action === 'saveAs') await saveProject(true);
@@ -1407,20 +1429,36 @@ async function exportLaunchToFile() {
 }
 
 function getProjectData() {
-  return { nodes, wires, meta: { ros_distro: 'humble', created: new Date().toISOString() } };
+  return {
+    nodes,
+    wires,
+    project: currentProject,
+    meta: { createdAt: new Date().toISOString() }
+  };
 }
 
 function loadProjectData(data) {
+  const graph = data?.graph || data || {};
   clearGraphNoConfirm();
   nodes = []; wires = []; nodeCounter = 0;
-  data.nodes.forEach(n => {
+  if (data?.project) {
+    currentProject = {
+      ...currentProject,
+      ...data.project,
+      workspace: {
+        ...currentProject.workspace,
+        ...(data.project.workspace || {})
+      }
+    };
+  }
+  (graph.nodes || []).forEach(n => {
     const node = { ...n, running:false };
     nodes.push(node);
     renderNode(node);
     const num = parseInt(node.id.split('_').pop() || '0', 10);
     nodeCounter = Math.max(nodeCounter, num);
   });
-  data.wires.forEach(w => { wires.push(w); renderWire(w); });
+  (graph.wires || []).forEach(w => { wires.push(w); renderWire(w); });
   updateStats(); updateWires();
 }
 
